@@ -1,0 +1,1 @@
+{"rustc":11549929042636398671,"features":"","declared_features":"","target":0,"profile":0,"path":0,"deps":[[14977922415461885228,"build_script_build",false,7332153495291516504]],"local":[{"RerunIfChanged":{"output":"debug/build/pci-ids-b8c3b8d5fef9b777/output","paths":["build.rs","pciids/pci.ids"]}}],"rustflags":[],"metadata":0,"config":0,"compile_kind":0}
