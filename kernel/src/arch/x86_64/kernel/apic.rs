@@ -527,12 +527,12 @@ fn init_ioapic() {
 
 	// now lets turn everything else on
 	for i in 0..max_entry {
-		if i != 2 {
+		if i != 0 {
 			ioapic_inton(i, 0 /*apic_processors[boot_processor]->id*/).unwrap();
 		} else {
 			// now, we don't longer need the IOAPIC timer and turn it off
 			info!("Disable IOAPIC timer");
-			ioapic_intoff(2, 0 /*apic_processors[boot_processor]->id*/).unwrap();
+			ioapic_intoff(0, 0 /*apic_processors[boot_processor]->id*/).unwrap();
 		}
 	}
 }
