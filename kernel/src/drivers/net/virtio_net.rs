@@ -728,7 +728,9 @@ impl VirtioNetDriver {
 			// the link status can be announced
 			| virtio_spec::net::F::STATUS
 			// Multiqueue support
-			| virtio_spec::net::F::MQ;
+			| virtio_spec::net::F::MQ
+        // device access to data in memory is limited/translated
+        | virtio_spec::net::F::ACCESS_PLATFORM;
 
 		// Currently the driver does NOT support the features below.
 		// In order to provide functionality for these, the driver
