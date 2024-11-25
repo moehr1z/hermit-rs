@@ -180,6 +180,9 @@ impl VirtioNetDriver {
 			}
 		};
 
+		// set memory enable bit
+		device.set_command(CommandRegister::MEMORY_ENABLE);
+
 		match drv.init_dev() {
 			Ok(_) => info!(
 				"Network device with id {:x}, has been initialized by driver!",
