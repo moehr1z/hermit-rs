@@ -8,7 +8,7 @@ use core::ptr::NonNull;
 use core::sync::atomic::{fence, Ordering};
 use core::{mem, ptr};
 
-use pci_types::capability::PciCapability;
+use pci_types::capability::{MsixCapability, PciCapability};
 use virtio_spec::pci::{
 	Cap, CapCfgType, CommonCfg, CommonCfgVolatileFieldAccess, CommonCfgVolatileWideFieldAccess,
 	IsrStatus as IsrStatusRaw,
@@ -318,6 +318,11 @@ pub struct VqCfgHandler<'a> {
 }
 
 impl<'a> VqCfgHandler<'a> {
+	pub fn set_msix_vector(&mut self) {
+		self.select_queue();
+		self.raw.as_mut_ptr().queue_msix_vector().write(0.into());
+	}
+
 	// TODO: Create type for queue selected invariant to get rid of `self.select_queue()` everywhere.
 	fn select_queue(&mut self) {
 		self.raw
@@ -891,6 +896,32 @@ fn read_caps(
 	} else {
 		Ok(capabilities)
 	}
+}
+
+/// Return MSI-X capability
+pub(crate) fn read_msix_cap(device: &PciDevice<PciConfigRegion>) -> Option<MsixCapability> {
+	let device_id = device.device_id();
+
+	let mut capabilities = device
+		.capabilities()
+		.unwrap()
+		.filter_map(|capability| match capability {
+			PciCapability::MsiX(capability) => Some(capability),
+			_ => None,
+		})
+		.collect::<Vec<_>>();
+
+	if capabilities.is_empty() {
+		warn!("No MSI-X capability found for device {:x}", device_id);
+		return None;
+	} else if capabilities.len() > 1 {
+		warn!(
+			"More than one MSI-X capability found for device {:x}",
+			device_id
+		);
+	}
+
+	return Some(capabilities.remove(0));
 }
 
 /// Maps memory areas indicated by devices BAR's into virtual address space.

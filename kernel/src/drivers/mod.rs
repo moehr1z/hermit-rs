@@ -4,6 +4,8 @@
 pub mod fs;
 #[cfg(not(feature = "pci"))]
 pub mod mmio;
+#[cfg(feature = "pci")]
+pub mod msix;
 #[cfg(any(feature = "tcp", feature = "udp"))]
 pub mod net;
 #[cfg(feature = "pci")]

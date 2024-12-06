@@ -607,14 +607,9 @@ impl NetworkDriver for VirtioNetDriver {
 		#[cfg(not(target_arch = "riscv64"))]
 		increment_irq_counter(32 + self.irq);
 
-		let result = if self.isr_stat.is_interrupt() {
-			true
-		} else if self.isr_stat.is_cfg_change() {
-			info!("Configuration changes are not possible! Aborting");
-			todo!("Implement possibility to change config on the fly...")
-		} else {
-			false
-		};
+		// With MSI-X you shouldn't check the ISR status, and since this is the handler for the
+		// queue we can just return true
+		let result = true;
 
 		self.isr_stat.acknowledge();
 

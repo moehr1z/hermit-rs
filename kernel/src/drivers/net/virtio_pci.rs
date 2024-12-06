@@ -3,17 +3,23 @@
 //! The module contains ...
 
 use alloc::vec::Vec;
+use core::ptr;
 use core::str::FromStr;
 
-use pci_types::CommandRegister;
+use pci_types::{Bar, CommandRegister};
 use smoltcp::phy::ChecksumCapabilities;
 
+use crate::arch::mm::PhysAddr;
 use crate::arch::pci::PciConfigRegion;
+use crate::core_scheduler;
+use crate::drivers::msix::*;
 use crate::drivers::net::virtio_net::{CtrlQueue, NetDevCfg, RxQueues, TxQueues, VirtioNetDriver};
+use crate::drivers::net::{apic, network_irqhandler, ExceptionStackFrame};
 use crate::drivers::pci::PciDevice;
+use crate::drivers::virtio::env::memory::*;
 use crate::drivers::virtio::error::{self, VirtioError};
 use crate::drivers::virtio::transport::pci;
-use crate::drivers::virtio::transport::pci::{PciCap, UniCapsColl};
+use crate::drivers::virtio::transport::pci::{read_msix_cap, PciCap, UniCapsColl};
 
 /// Virtio's network device configuration structure.
 /// See specification v1.1. - 5.1.4
@@ -180,8 +186,68 @@ impl VirtioNetDriver {
 			}
 		};
 
-		// set memory enable bit
-		device.set_command(CommandRegister::MEMORY_ENABLE);
+		// get msi-x bar
+		let mut cap = read_msix_cap(device);
+		if let Some(mut msix_cap) = cap {
+			let table_bar_nr = msix_cap.table_bar();
+			let bar = device.get_bar(table_bar_nr);
+
+			// set memory enable bit
+			device.set_command(CommandRegister::MEMORY_ENABLE);
+
+			match bar {
+				Some(Bar::Memory32 {
+					address,
+					size,
+					prefetchable,
+				}) => {
+					let virtual_address = VirtMemAddr::from(
+						crate::mm::map(
+							PhysAddr::from(address as u64),
+							size.try_into().unwrap(),
+							true,
+							true,
+							true,
+						)
+						.0,
+					);
+
+					let table_base: usize =
+						(virtual_address + MemOff::from(msix_cap.table_offset())).into();
+
+					// Set table entry
+					let lapic_id = 1;
+					let rh = false;
+					let dm = true;
+					let addr = message_address(lapic_id, rh, dm);
+
+					let irq = 32 + device.get_irq().unwrap();
+					let data = message_data_edge_triggered(DeliveryMode::Fixed, irq);
+
+					// set MSI-X table entry
+					let addr_lo = (table_base + 0 * 4) as *mut u32;
+					let addr_hi = (table_base + 1 * 4) as *mut u32;
+					let msg_data = (table_base + 2 * 4) as *mut u32;
+					let vec_ctl = (table_base + 3 * 4) as *mut u32;
+
+					unsafe {
+						ptr::write(addr_lo, addr as u32);
+						ptr::write(addr_hi, (addr >> 32) as u32);
+						ptr::write(msg_data, data);
+						ptr::write(vec_ctl, 0);
+					}
+
+					msix_cap.set_enabled(true, device.access());
+				}
+				_ => {
+					warn!("Expected 32 bit MSI-X BAR. Not using MSI-X.");
+				}
+			}
+		} else {
+			warn!("No MSI-X capability found. Not using MSI-X.");
+			// set memory enable bit
+			device.set_command(CommandRegister::MEMORY_ENABLE);
+		}
 
 		match drv.init_dev() {
 			Ok(_) => info!(

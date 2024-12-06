@@ -414,6 +414,8 @@ impl Virtq for SplitVq {
 			None => return Err(VirtqError::QueueNotExisting(index.into())),
 		};
 
+		vq_handler.set_msix_vector();
+
 		let size = vq_handler.set_vq_size(size.0);
 		const ALLOCATOR: DeviceAlloc = DeviceAlloc;
 
