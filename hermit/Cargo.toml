@@ -55,5 +55,5 @@ idle-poll = []
 
 [build-dependencies]
 flate2 = "1"
-ureq = "2.4"
+ureq = "3.0"
 tar = "0.4"
